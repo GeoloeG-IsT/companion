@@ -254,6 +254,7 @@ export function buildRoutes(state: ApiState) {
   api.get("/agents/:name", async (c) => {
     const ctrl = getController(state);
     const name = c.req.param("name");
+    validateName(name, "name");
     const config = await ctrl.team.getConfig();
     const member = config.members.find((m) => m.name === name);
     if (!member) {
@@ -270,6 +271,7 @@ export function buildRoutes(state: ApiState) {
   api.post("/agents/:name/messages", async (c) => {
     const ctrl = getController(state);
     const name = c.req.param("name");
+    validateName(name, "name");
     const body = await c.req.json<SendMessageBody>();
     if (!body.message) {
       return c.json({ error: "message is required" }, 400);
@@ -281,6 +283,7 @@ export function buildRoutes(state: ApiState) {
   api.post("/agents/:name/kill", async (c) => {
     const ctrl = getController(state);
     const name = c.req.param("name");
+    validateName(name, "name");
     await ctrl.killAgent(name);
     return c.json({ ok: true });
   });
@@ -288,6 +291,7 @@ export function buildRoutes(state: ApiState) {
   api.post("/agents/:name/shutdown", async (c) => {
     const ctrl = getController(state);
     const name = c.req.param("name");
+    validateName(name, "name");
     await ctrl.sendShutdownRequest(name);
     return c.json({ ok: true });
   });
@@ -295,6 +299,7 @@ export function buildRoutes(state: ApiState) {
   api.post("/agents/:name/approve-plan", async (c) => {
     const ctrl = getController(state);
     const name = c.req.param("name");
+    validateName(name, "name");
     const body = await c.req.json<ApprovePlanBody>();
     if (!body.requestId) {
       return c.json({ error: "requestId is required" }, 400);
@@ -312,6 +317,7 @@ export function buildRoutes(state: ApiState) {
   api.post("/agents/:name/approve-permission", async (c) => {
     const ctrl = getController(state);
     const name = c.req.param("name");
+    validateName(name, "name");
     const body = await c.req.json<ApprovePermissionBody>();
     if (!body.requestId) {
       return c.json({ error: "requestId is required" }, 400);
@@ -395,6 +401,7 @@ export function buildRoutes(state: ApiState) {
     if (!body.agent) {
       return c.json({ error: "agent is required" }, 400);
     }
+    validateName(body.agent, "agent");
     const exists = await ctrl.tasks.get(id).catch(() => null);
     if (!exists) {
       return c.json({ error: `Task "${id}" not found` }, 404);

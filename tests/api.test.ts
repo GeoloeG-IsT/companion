@@ -955,6 +955,55 @@ describe("createApi validation", () => {
     await ctrl.shutdown();
   });
 
+  it("GET /agents/:name rejects path traversal", async () => {
+    const teamName = `val-${randomUUID().slice(0, 8)}`;
+    const ctrl = new ClaudeCodeController({ teamName, logLevel: "silent" });
+    await ctrl.init();
+    const app = createApi(ctrl);
+
+    const res = await app.request("/agents/..%2Fcontroller", { method: "GET" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("name");
+
+    await ctrl.shutdown();
+  });
+
+  it("POST /agents/:name/messages rejects path traversal", async () => {
+    const teamName = `val-${randomUUID().slice(0, 8)}`;
+    const ctrl = new ClaudeCodeController({ teamName, logLevel: "silent" });
+    await ctrl.init();
+    const app = createApi(ctrl);
+
+    const res = await app.request("/agents/..%2Fevil/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "hi" }),
+    });
+    expect(res.status).toBe(400);
+
+    await ctrl.shutdown();
+  });
+
+  it("POST /tasks/:id/assign rejects path traversal in agent name", async () => {
+    const teamName = `val-${randomUUID().slice(0, 8)}`;
+    const ctrl = new ClaudeCodeController({ teamName, logLevel: "silent" });
+    await ctrl.init();
+    const app = createApi(ctrl);
+
+    const task = await ctrl.createTask({ subject: "test", description: "test" });
+    const res = await app.request(`/tasks/${task}/assign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: "../../../etc" }),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("agent");
+
+    await ctrl.shutdown();
+  });
+
   it("POST /session/init accepts valid names with hyphens and underscores", async () => {
     const app = createApi();
     const res = await app.request("/session/init", {
