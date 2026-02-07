@@ -16,6 +16,7 @@ import type {
 // ─── Validation ──────────────────────────────────────────────────────────────
 
 const SAFE_NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+const SAFE_TASK_ID_RE = /^[0-9]{1,10}$/;
 
 function validateName(value: string, field: string): void {
   if (!SAFE_NAME_RE.test(value)) {
@@ -25,11 +26,21 @@ function validateName(value: string, field: string): void {
   }
 }
 
+function validateTaskId(value: string): void {
+  if (!SAFE_TASK_ID_RE.test(value)) {
+    throw new ValidationError("task id must be a numeric string (1-10 digits)");
+  }
+}
+
 class ValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ValidationError";
   }
+}
+
+function isNotFoundError(err: unknown): boolean {
+  return err instanceof Error && /not found/i.test(err.message);
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -365,30 +376,45 @@ export function buildRoutes(state: ApiState) {
   api.get("/tasks/:id", async (c) => {
     const ctrl = getController(state);
     const id = c.req.param("id");
-    const task = await ctrl.tasks.get(id).catch(() => null);
-    if (!task) {
-      return c.json({ error: `Task "${id}" not found` }, 404);
+    validateTaskId(id);
+    try {
+      const task = await ctrl.tasks.get(id);
+      return c.json(task);
+    } catch (err) {
+      if (isNotFoundError(err)) {
+        return c.json({ error: `Task "${id}" not found` }, 404);
+      }
+      throw err;
     }
-    return c.json(task);
   });
 
   api.patch("/tasks/:id", async (c) => {
     const ctrl = getController(state);
     const id = c.req.param("id");
+    validateTaskId(id);
     const body = await c.req.json<UpdateTaskBody>();
-    const task = await ctrl.tasks.update(id, body).catch(() => null);
-    if (!task) {
-      return c.json({ error: `Task "${id}" not found` }, 404);
+    try {
+      const task = await ctrl.tasks.update(id, body);
+      return c.json(task);
+    } catch (err) {
+      if (isNotFoundError(err)) {
+        return c.json({ error: `Task "${id}" not found` }, 404);
+      }
+      throw err;
     }
-    return c.json(task);
   });
 
   api.delete("/tasks/:id", async (c) => {
     const ctrl = getController(state);
     const id = c.req.param("id");
-    const exists = await ctrl.tasks.get(id).catch(() => null);
-    if (!exists) {
-      return c.json({ error: `Task "${id}" not found` }, 404);
+    validateTaskId(id);
+    try {
+      await ctrl.tasks.get(id);
+    } catch (err) {
+      if (isNotFoundError(err)) {
+        return c.json({ error: `Task "${id}" not found` }, 404);
+      }
+      throw err;
     }
     await ctrl.tasks.delete(id);
     return c.json({ ok: true });
@@ -397,14 +423,19 @@ export function buildRoutes(state: ApiState) {
   api.post("/tasks/:id/assign", async (c) => {
     const ctrl = getController(state);
     const id = c.req.param("id");
+    validateTaskId(id);
     const body = await c.req.json<AssignTaskBody>();
     if (!body.agent) {
       return c.json({ error: "agent is required" }, 400);
     }
     validateName(body.agent, "agent");
-    const exists = await ctrl.tasks.get(id).catch(() => null);
-    if (!exists) {
-      return c.json({ error: `Task "${id}" not found` }, 404);
+    try {
+      await ctrl.tasks.get(id);
+    } catch (err) {
+      if (isNotFoundError(err)) {
+        return c.json({ error: `Task "${id}" not found` }, 404);
+      }
+      throw err;
     }
     await ctrl.assignTask(id, body.agent);
     return c.json({ ok: true });

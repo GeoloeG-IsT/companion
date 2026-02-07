@@ -1004,6 +1004,48 @@ describe("createApi validation", () => {
     await ctrl.shutdown();
   });
 
+  it("GET /tasks/:id rejects path traversal in task id", async () => {
+    const teamName = `val-${randomUUID().slice(0, 8)}`;
+    const ctrl = new ClaudeCodeController({ teamName, logLevel: "silent" });
+    await ctrl.init();
+    const app = createApi(ctrl);
+
+    const res = await app.request("/tasks/..%2F..%2Fetc%2Fpasswd", { method: "GET" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("task id");
+
+    await ctrl.shutdown();
+  });
+
+  it("PATCH /tasks/:id rejects non-numeric task id", async () => {
+    const teamName = `val-${randomUUID().slice(0, 8)}`;
+    const ctrl = new ClaudeCodeController({ teamName, logLevel: "silent" });
+    await ctrl.init();
+    const app = createApi(ctrl);
+
+    const res = await app.request("/tasks/abc", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "completed" }),
+    });
+    expect(res.status).toBe(400);
+
+    await ctrl.shutdown();
+  });
+
+  it("DELETE /tasks/:id rejects path traversal", async () => {
+    const teamName = `val-${randomUUID().slice(0, 8)}`;
+    const ctrl = new ClaudeCodeController({ teamName, logLevel: "silent" });
+    await ctrl.init();
+    const app = createApi(ctrl);
+
+    const res = await app.request("/tasks/..%2Fconfig", { method: "DELETE" });
+    expect(res.status).toBe(400);
+
+    await ctrl.shutdown();
+  });
+
   it("POST /session/init accepts valid names with hyphens and underscores", async () => {
     const app = createApi();
     const res = await app.request("/session/init", {
